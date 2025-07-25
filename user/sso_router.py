@@ -71,13 +71,21 @@ async def sso_auth(provider: str, request: Request, db: Session = Depends(get_db
     """
     token = await oauth.create_client(provider).authorize_access_token(request)
     if provider == "google":
-        user_info = await oauth.google.parse_id_token(request, token)
+        # user_info = await oauth.google.parse_id_token(request, token)
+        # print(user_info,'$$$$$$$$$$$$$$$$$$$$$$$$')
+        user_info = await oauth.google.userinfo(token=token)
         email = user_info.get("email")
+        first_name = user_info.get("given_name")
+        last_name = user_info.get("family_name")
         username = user_info.get("email").split("@")[0]
+
     elif provider == "github":
         resp = await oauth.github.get('user', token=token)
         profile = resp.json()
         email = profile.get("email")
+        first_name = profile.get("name")
+        last_name = None
+
         if not email:
             # GitHub may not return email, fetch from /emails endpoint
             emails_resp = await oauth.github.get('user/emails', token=token)
@@ -89,7 +97,7 @@ async def sso_auth(provider: str, request: Request, db: Session = Depends(get_db
 
     # Register or login the user
     user_service = UserService(db)
-    user = user_service.get_or_create_oauth_user(email=email, username=username, provider=provider)
+    user = user_service.get_or_create_oauth_user(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
     # Generate your auth_code/session here as per your system
     auth_data = user_service.generate_auth_code_for_user(user)
     return auth_data

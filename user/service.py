@@ -130,11 +130,12 @@ class UserService:
             return []
         return user.role.permissions.split(",")
 
-    def get_or_create_oauth_user(self, email: str, username: str, provider: str):
-        user = self.repo.get_by_email(email)
+    def get_or_create_oauth_user(self, email: str, username: str, first_name: str, last_name: str, provider: str):
+        user = self.repo.get_user_by_email_and_username(email=email, username=username)
         if not user:
-            # You can add more fields as needed
-            user = self.repo.add_user_oauth(email=email, username=username, provider=provider)
+            user = self.repo.get_user_by_email()
+        if not user:
+            user = self.repo.add_user_oauth(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
         return user
 
     def generate_auth_code_for_user(self, user):

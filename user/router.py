@@ -23,7 +23,7 @@ from .config import settings
 router = APIRouter()
 
 
-router.include_router(sso_router, prefix="/sso", tags=["SSO"])
+router.include_router(sso_router, prefix="/sso")
 
 
 

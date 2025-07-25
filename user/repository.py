@@ -20,6 +20,9 @@ class UserRepository:
     
     def get_user_by_id_and_email(self, user_id: str, email: str) -> Optional[User]:
         return self.db.query(User).filter_by(id=user_id, email=email).first()
+    
+    def get_user_by_email_and_username(self, email: str, username: str) -> Optional[User]:
+        return self.db.query(User).filter_by(email=email, username=username).first()
 
     def add_user(self, user: User):
         self.db.add(user)
@@ -41,10 +44,12 @@ class UserRepository:
         self.db.refresh(role)
         return role
 
-    def add_user_oauth(self, email: str, username: str, provider: str):
+    def add_user_oauth(self, email: str, username: str, first_name: str, last_name: str, provider: str):
         user = User(
             email=email,
             username=username,
+            first_name=first_name,
+            last_name=last_name,
             is_active=True,
             is_verified=True,
             oauth_provider=provider
