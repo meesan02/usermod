@@ -2,9 +2,11 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 class UserBase(BaseModel):
-    user_id: str = Field(..., max_length=36)
+    user_id: Optional[str] = Field(None, max_length=36)
     username: Optional[str] = Field(None, max_length=100)
     email: Optional[EmailStr] = Field(None, max_length=100)
+    roles: Optional[list[str]] = Field(None, max_length=255)
+
 
 class UserCreate(BaseModel):
     first_name: str = Field(..., max_length=100)
@@ -59,20 +61,44 @@ class PermissionsRequest(UserBase):
 
 class RoleBase(BaseModel):
     name: str = Field(..., max_length=72)
-    permissions: Optional[str] = Field(..., max_length=255)
+    permissions: Optional[list[str]] = Field(None, max_length=255)
 
 class RoleCreate(RoleBase):
     pass
 
 class RoleInDB(RoleBase):
     id: str = Field(..., max_length=36)
-    users: Optional[list[UserInDB]] = []
+    # users: Optional[list[UserInDB]] = []
 
 class GetRole(RoleBase):
     user_id: str = Field(..., max_length=36)
+
+
+class PermissionBase(BaseModel):
+    name: str = Field(..., max_length=72)
+    description: Optional[str] = Field(None, max_length=255)
+
+class PermissionCreate(PermissionBase):
+    pass
+
+class PermissionInDB(PermissionBase): # TODO: Check this.
+    id: str = Field(..., max_length=36)
+    roles: Optional[list[RoleInDB]] = []
+
+class GetPermission(PermissionBase):
+    role_id: str = Field(..., max_length=36)
 
 
 # class RoleOut(BaseModel):
 #     user_id: str
 #     name: str
 #     permissions: str
+
+
+class Role(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+

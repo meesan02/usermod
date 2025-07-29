@@ -14,6 +14,8 @@ from .schemas import (
     RoleBase,
     RoleCreate,
     RoleInDB,
+    PermissionCreate,
+    PermissionBase,
 )
 from .service import UserService
 from .repository import UserRepository
@@ -38,8 +40,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         last_name=new_user.last_name,
         is_active=new_user.is_active,
         is_verified=new_user.is_verified,
-        role=new_user.role.name if new_user.role else None,
-        consent=new_user.consent
+        consent=new_user.consent,
+        roles=[role.name for role in new_user.roles]
     )
 
 @router.post("/login")
@@ -65,9 +67,11 @@ def assign_role(request: AssignRoleRequest, db: Session = Depends(get_db)):
         user_id=updated_user.id,
         email=updated_user.email,
         username=updated_user.username,
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
         is_active=updated_user.is_active,
         is_verified=updated_user.is_verified,
-        role=updated_user.role.name if updated_user.role else None
+        roles=[role.name for role in updated_user.roles]
     )
 
 
@@ -89,21 +93,31 @@ def get_current_user(user: UserBase, db: Session = Depends(get_db)):
         last_name=user.last_name,
         is_active=user.is_active,
         is_verified=user.is_verified,
-        role=user.role.name if user.role else None,
-        consent=user.consent
+        consent=user.consent,
+        roles=[role.name for role in user.roles]
     )
 
 
 @router.post("/create-role", response_model=RoleInDB)
 def create_role(role: RoleCreate, db: Session = Depends(get_db)):
-    role_exists = UserRepository(db).get_role_by_name(role_name=role.name)
+    user_repo = UserRepository(db)
+    user_service = UserService(db)
+    # print(role)
+    # print(role.name)
+    # for permission in role.permissions:
+    #     # if not user_repo.get_permission_by_name(permission_name=permission):
+    #     permissions = user_repo.add_permission(permission=permission)
+    #     print(permissions)
+    role_exists = user_repo.get_role_by_name(role_name=role.name)
+    # print(role_exists)
     if role_exists:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role already exists")
-    role = UserRepository(db).add_role(role)
+    role = user_service.get_or_create_role(role_name=role.name, permissions=role.permissions)
+    # print(role.id, role.name, role.permissions)
     return RoleInDB(
         id=role.id,
         name=role.name,
-        permissions=role.permissions
+        permissions=user_service.format_permissions(role.permissions)
     )
 
 @router.post("/get-roles", response_model=RoleInDB)
@@ -114,6 +128,6 @@ def get_roles(role: RoleBase, db: Session = Depends(get_db)):
     return RoleInDB(
         id=role.id,
         name=role.name,
-        permissions=role.permissions,
-        users=role.users
+        permissions=UserService(db).format_permissions(role.permissions),
+        # users=role.users
     )

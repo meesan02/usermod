@@ -8,8 +8,3 @@ email_validator==2.2.0
 idna==3.10
 itsdangerous==2.2.0
 passlib==1.7.4
-SESSION_SECRET_KEY=<QFL79OdEGcCDRWxQ6ev8sQUzYKgQ3QNeqtyfsQnsFBcxyz>
-GOOGLE_CLIENT_ID=<xyz126829546132-hd4pg8cnqs7qkjm2fgr7cqn7f3gd3tf5.apps.googleusercontent.com>
-GOOGLE_CLIENT_SECRET=<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xyz>
-GITHUB_CLIENT_ID=<xyzOv23liiRQkZ8cApygUCB>
-GITHUB_CLIENT_SECRET=<00d8ef9e1a171cb5458de3619028843a4dacdf9fxyznjcns>

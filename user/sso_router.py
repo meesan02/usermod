@@ -5,6 +5,7 @@ from .service import UserService
 from .db import get_db
 from sqlalchemy.orm import Session
 from .config import settings
+from .schemas import UserBase
 
 
 router = APIRouter()
@@ -48,8 +49,8 @@ async def list_sso_providers():
     return list(oauth._clients.keys())
 
 
-@router.get("/login", summary="Redirect to SSO provider for login")
-async def sso_login(request: Request, provider: str = Query(..., description="The SSO provider to use")):
+@router.get("/login/{provider}", summary="Redirect to SSO provider for login")
+async def sso_login(request: Request, provider: str):
     """
     Initiates the SSO login flow by redirecting the user to the selected provider's authorization page.
     The provider must be one of the available providers from the /providers endpoint.
@@ -99,5 +100,5 @@ async def sso_auth(provider: str, request: Request, db: Session = Depends(get_db
     user_service = UserService(db)
     user = user_service.get_or_create_oauth_user(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
     # Generate your auth_code/session here as per your system
-    auth_data = user_service.generate_auth_code_for_user(user)
+    auth_data = user_service.authenticate_user(user_data=user)
     return auth_data

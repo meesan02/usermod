@@ -1,4 +1,4 @@
-from .models import Role, User
+from .models import Role, User, Permission
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -58,3 +58,23 @@ class UserRepository:
         self.db.commit()
         self.db.refresh(user)
         return user
+    
+    def get_permission_by_name(self, permission_name: str) -> Optional[Permission]:
+        return self.db.query(Permission).filter(Permission.name == permission_name).first()
+
+    def add_permission(self, permission: str, description: str = None):
+        # print(permission, '^^^^^^^^^')
+        # print(type(permission), '^^^^^^^^^')
+        permission_exists = self.get_permission_by_name(permission)
+        print(permission_exists, '^^^^^^^^^')
+        if permission_exists:
+            return permission_exists
+        permission_data = Permission(name=permission, description=description)
+        self.db.add(permission_data)
+        print('_____________')
+        self.db.commit()
+        print('__________5555555___')
+        self.db.refresh(permission)
+        print('################')
+        return permission
+

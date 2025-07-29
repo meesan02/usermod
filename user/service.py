@@ -1,4 +1,4 @@
-from .models import User
+from .models import User, Permission, Role
 from .repository import UserRepository
 from .helper import hash_password, verify_password
 from fastapi import HTTPException, status
@@ -27,14 +27,28 @@ class UserService:
         return self.repo.add_user(new_user)
 
     def authenticate_user(self, user_data):
-        if user_data.email:
-            user = self.repo.get_by_email(user_data.email)
-        elif user_data.username:
-            user = self.repo.get_by_username(user_data.username)
+        user = None
+        # print(user_data)
+        if hasattr(user_data, 'password'):
+            # print(user)
+            if user_data.email:
+                print(user_data.email)
+                user = self.repo.get_by_email(user_data.email)
+                print(user)
+            elif user_data.username:
+                user = self.repo.get_by_username(user_data.username)
 
-        if not user or not verify_password(user_data.password, user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        # Generate expiry timestamp (UTC, seconds since epoch)
+            if (not user or not verify_password(user_data.password, user.hashed_password)):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
+        elif isinstance(user_data, User):
+            print('______________')
+            user = user_data
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not authenticate user")
+        
+        # Generate expiry timestamp (UTC, hours since epoch)
         expiry = int((datetime.utcnow() + timedelta(hours=1)).timestamp())
         # Generate a secure random string
         rand_token = secrets.token_urlsafe(60)
@@ -45,7 +59,8 @@ class UserService:
         self.repo.update_user(user)
         return {
             # "user_id": user.id,
-            "auth_code": auth_code
+            "auth_code": auth_code,
+            "auth_code_expiry": datetime.utcfromtimestamp(expiry).isoformat(sep=' ')
         }
 
     def forgot_password(self, email: str):
@@ -131,23 +146,36 @@ class UserService:
         return user.role.permissions.split(",")
 
     def get_or_create_oauth_user(self, email: str, username: str, first_name: str, last_name: str, provider: str):
-        user = self.repo.get_user_by_email_and_username(email=email, username=username)
-        if not user:
-            user = self.repo.get_user_by_email()
-        if not user:
-            user = self.repo.add_user_oauth(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
-        return user
+        user = self.repo.get_by_email(email=email)
+        if user:
+            if not user.oauth_provider:
+                user.oauth_provider = provider
+                self.repo.update_user(user)
+            return user
+        if self.repo.get_by_username(username):
+                # Handle potential username collision from a different account
+                username = f"{username}_{secrets.token_hex(4)}"
+        return self.repo.add_user_oauth(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
 
-    def generate_auth_code_for_user(self, user):
-        # Your existing logic to generate auth_code and expiry
-        # Example:
-        import secrets, base64
-        from datetime import datetime, timedelta
-        expiry = int((datetime.utcnow() + timedelta(hours=1)).timestamp())
-        rand_token = secrets.token_urlsafe(48)
-        raw_code = f"{expiry}:{rand_token}"
-        auth_code = base64.urlsafe_b64encode(raw_code.encode()).decode()
-        user.auth_code = auth_code
-        user.auth_code_expiry = datetime.utcfromtimestamp(expiry)
-        self.repo.update_user(user)
-        return {"user_id": user.id, "auth_code": auth_code, "auth_code_expiry": user.auth_code_expiry.isoformat() + "Z"}
+    def get_or_create_permission(self, permission_name: str):
+        permission = self.repo.get_permission_by_name(permission_name)
+        if not permission:
+            permission = Permission(name=permission_name)
+            permission = self.repo.add_permission(permission)
+        return permission
+    
+    def get_or_create_role(self, role_name: str, permissions: list[str] = None):
+        role = self.repo.get_role_by_name(role_name)
+        # print(role_name, permissions)
+        if not role:
+            role = Role(name=role_name)
+            for i in permissions:
+                permission = self.get_or_create_permission(i)
+                role.permissions.append(permission)
+            # print(role)
+            role = self.repo.add_role(role)
+        return role
+    
+    def format_permissions(self, permissions: list[Permission]) -> list[str]:
+        return [permission.name for permission in permissions]
+
