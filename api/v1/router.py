@@ -1,0 +1,159 @@
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
+from .sso_router import router as sso_router
+from db import get_db
+from schemas import (
+    UserBase,
+    UserCreate,
+    UserInDB,
+    UserLogin,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    AssignRoleRequest,
+    PermissionsRequest,
+    RoleBase,
+    RoleCreate,
+    RoleInDB,
+)
+from services import UserService
+from repository import UserRepository
+
+
+router = APIRouter()
+
+
+router.include_router(sso_router, prefix="/sso")
+
+
+
+@router.post("/register", response_model=UserInDB)
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    new_user = UserService(db).register_user(user)
+    return UserInDB(
+        user_id=new_user.id,
+        email=new_user.email,
+        username=new_user.username,
+        first_name=new_user.first_name,
+        last_name=new_user.last_name,
+        is_active=new_user.is_active,
+        is_verified=new_user.is_verified,
+        consent=new_user.consent,
+        roles=[role.name for role in new_user.roles]
+    )
+
+@router.post("/login")
+def login(user: UserLogin, request: Request, db: Session = Depends(get_db)):
+    application = request.headers.get("X-Application")
+    return UserService(db).authenticate_user(user, application)
+
+@router.get("/authenticate")
+def authenticate(request: Request, db: Session = Depends(get_db)):
+    auth_code = request.headers.get("X-Auth-Code")
+    application = request.headers.get("X-Application")
+    if UserService(db).validate_auth_code(auth_code, application):
+        return {"status_code": status.HTTP_200_OK, "message": "Authentication successful"}
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    request_data: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)
+):
+    application = request.headers.get("X-Application")
+    return UserService(db).forgot_password(request_data.email, application)
+
+@router.post("/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    return UserService(db).reset_password(request.token, request.new_password)
+
+@router.post("/permissions", response_model=list[str])
+def get_permissions(request: PermissionsRequest, db: Session = Depends(get_db)):
+    return UserService(db).get_user_permissions(request.user_id)
+
+@router.post("/assign-role", response_model=UserInDB)
+def assign_role(request: AssignRoleRequest, db: Session = Depends(get_db)):
+    updated_user = UserService(db).assign_role(request.user_id, request.role_name)
+    return UserInDB(
+        user_id=updated_user.id,
+        email=updated_user.email,
+        username=updated_user.username,
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
+        is_active=updated_user.is_active,
+        is_verified=updated_user.is_verified,
+        roles=[role.name for role in updated_user.roles]
+    )
+
+
+@router.post("/get-user", response_model=UserInDB)
+def get_current_user(user: UserBase, db: Session = Depends(get_db)):
+    if user.email and user.user_id:
+        user = UserRepository(db).get_user_by_id_and_email(user_id=user.user_id, email=user.email)
+    elif user.username and user.user_id:
+        user = UserRepository(db).get_user_by_id_and_username(user_id=user.user_id, username=user.username)
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email or Username or User ID not provided")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return UserInDB(
+        user_id=user.id,
+        username=user.username,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        consent=user.consent,
+        roles=[role.name for role in user.roles]
+    )
+
+
+@router.post("/create-role", response_model=RoleInDB)
+def create_role(role: RoleCreate, db: Session = Depends(get_db)):
+    user_repo = UserRepository(db)
+    user_service = UserService(db)
+    # for permission in role.permissions:
+    #     # if not user_repo.get_permission_by_name(permission_name=permission):
+    #     permissions = user_repo.add_permission(permission=permission)
+    #     print(permissions)
+    role_exists = user_repo.get_role_by_name(role_name=role.name)
+    if role_exists:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role already exists")
+    role = user_service.get_or_create_role(role_name=role.name, permissions=role.permissions)
+    return RoleInDB(
+        id=role.id,
+        name=role.name,
+        permissions=user_service.format_permissions(role.permissions)
+    )
+
+@router.post("/get-roles", response_model=RoleInDB)
+def get_roles(role: RoleBase, db: Session = Depends(get_db)):
+    role = UserRepository(db).get_role_by_name(role_name=role.name)
+    if not role:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+    return RoleInDB(
+        id=role.id,
+        name=role.name,
+        permissions=UserService(db).format_permissions(role.permissions),
+        # users=role.users
+    )
+
+@router.post("/applications")
+def get_applications(user: UserBase, db: Session = Depends(get_db)):
+    return UserRepository(db).get_applications_by_user_id(user_id=user.user_id)
+
+@router.post("/update-applications")
+def update_applications(user: UserBase, application: str, db: Session = Depends(get_db)):
+    try:
+        return UserService(db).update_application(user_id=user.user_id, application=application)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post('/enrol-application')
+def enrol_application(application: str, description: str = None, db: Session = Depends(get_db)):
+    try:
+        return UserService(db).enrol_application(application, description)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
