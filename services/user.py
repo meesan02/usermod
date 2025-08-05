@@ -1,7 +1,7 @@
 from models import User, Permission, Role
 from repository import UserRepository
 from helper import hash_password, verify_password
-from fastapi import HTTPException, status, Request
+from fastapi import HTTPException, status
 import secrets
 import base64
 from datetime import datetime, timedelta
@@ -142,9 +142,21 @@ class UserService:
         role = self.repo.get_role_by_name(role_name)
         if not user or not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or role not found")
-        user.role_id = role.id
+        if role in user.roles:
+            return {"detail": "Role is already assigned to the user."}
+        user.roles.append(role)
         self.repo.update_user(user)
-        return user
+        return {"detail": "Role assigned successfully."}
+
+    def remove_role(self, user_id: str, role_name: str):
+        user = self.repo.get_user_by_id(user_id)
+        role = self.repo.get_role_by_name(role_name)
+        if not user or not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or role not found")
+        if role in user.roles:
+            user.roles.remove(role)
+            self.repo.update_user(user)
+        return {"detail": "Role removed successfully."}
 
     def get_user_permissions(self, user_id: str):
         user = self.repo.get_user_by_id(user_id)
@@ -153,7 +165,8 @@ class UserService:
             return []
         permissions = []
         for i in user.roles:
-            permissions.append(self.get_permissions_by_role(i.name))
+            for j in self.get_permissions_by_role(i.name):
+                permissions.append(j.name)
         return permissions
     
     def get_permissions_by_role(self, role_name: str):
@@ -172,23 +185,47 @@ class UserService:
                 username = f"{username}_{secrets.token_hex(4)}"
         return self.repo.add_user_oauth(email=email, username=username, first_name=first_name, last_name=last_name, provider=provider)
 
-    def get_or_create_permission(self, permission_name: str):
+    def create_permission(self, permission_name: str, permission_description: str = None):
+        return self.repo.add_permission(permission_name, permission_description)
+    
+    def get_permission(self, permission_name: str):
         permission = self.repo.get_permission_by_name(permission_name)
         if not permission:
-            permission = Permission(name=permission_name)
-            permission = self.repo.add_permission(permission)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permission not found")
         return permission
-    
-    def get_or_create_role(self, role_name: str, permissions: list[str] = None):
+
+    def create_role(self, role_name: str, permissions: list[str] = None):
+        role = Role(name=role_name)
+        for i in permissions:
+            permission = self.get_permission(i)
+            role.permissions.append(permission)
+        role = self.repo.add_role(role)
+        return role
+
+    def get_role(self, role_name: str):
         role = self.repo.get_role_by_name(role_name)
         if not role:
-            role = Role(name=role_name)
-            for i in permissions:
-                permission = self.get_or_create_permission(i)
-                role.permissions.append(permission)
-            role = self.repo.add_role(role)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
         return role
     
+    def add_permission_to_role(self, role_name: str, permission_name: str):
+        role = self.get_role(role_name)
+        permission = self.get_permission(permission_name)
+        role.permissions.append(permission)
+        self.repo.update_role(role)
+        return {"detail": "Permission added to role successfully."}
+    
+    def remove_permission_from_role(self, role_name: str, permission_name: str):
+        role = self.repo.get_role_by_name(role_name)
+        permission = self.repo.get_permission_by_name(permission_name)
+        if not role or not permission:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role or permission not found")
+        if permission in role.permissions:
+            role.permissions.remove(permission)
+            self.repo.update_role(role)
+            return {"detail": "Permission removed from role successfully."}
+        return {"detail": "Permission not found in the role."}
+
     def format_permissions(self, permissions: list[Permission]) -> list[str]:
         return [permission.name for permission in permissions]
 
@@ -227,4 +264,19 @@ class UserService:
             )
         
         return True
+    
+    def create_route_map(self, route: str, permission: str):
+        return self.repo.create_route_map(route, permission)
+    
+    def update_route_map_permission(self, route: str, old_permission: str, new_permission: str):
+        return self.repo.update_route_map_permission(route, old_permission, new_permission)
+    
+    def delete_route_map(self, route: str):
+        return self.repo.delete_route_map(route)
+    
+    def fetch_route_map(self, route: str):
+        return self.repo.fetch_route_map(route)
+    
+    def fetch_all_route_map(self):
+        return self.repo.fetch_all_route_map()
         

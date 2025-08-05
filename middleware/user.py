@@ -3,14 +3,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from services import UserService
 from db import get_db
+from core import NotFoundException, AlreadyExistsException
 
 
 # Define public paths for more maintainable and readable code
 SYSTEM_PREFIXES = {"/docs", "/redoc"}
 SYSTEM_SUBSTRINGS = {"/openapi"}
+PUBLIC_PREFIXES = {"/verify-user"}
 PUBLIC_SUBSTRINGS = {"/sso/"}
 # PUBLIC_SUBSTRINGS = {"/sso/", "/favicon.ico"}
-PUBLIC_SUFFIXES = {"/register", "/login", "/forgot-password", "/reset-password"}
+PUBLIC_SUFFIXES = {"/login", "/forgot-password", "/reset-password"}
+SUFFIXES ={"/register"}
 # ENROL_SUBSTRINGS = {"/enrol-application", "/applications"}
 ENROL_SUBSTRINGS = {"/enrol-application"}
 
@@ -21,19 +24,26 @@ def is_public_path(path: str) -> bool:
         return True
     if any(substring in path for substring in SYSTEM_SUBSTRINGS):
         return True
-    if any(substring in path for substring in PUBLIC_SUBSTRINGS):
+    if any(substring in path for substring in PUBLIC_PREFIXES):
         return True
+    # if any(substring in path for substring in PUBLIC_SUBSTRINGS):
+    #     return True
     return False
 
 def is_public_endpoint(path: str) -> bool:
-    # if any(substring in path for substring in PUBLIC_SUBSTRINGS):
-    #     return True
+    if any(substring in path for substring in PUBLIC_SUBSTRINGS):
+        return True
     if any(path.endswith(suffix) for suffix in PUBLIC_SUFFIXES):
         return True
     return False
 
 def is_enrol_endpoint(path: str) -> bool:
     if any(substring in path for substring in ENROL_SUBSTRINGS):
+        return True
+    return False
+
+def is_exception_endpoint(path: str) -> bool:
+    if any(path.endswith(suffix) for suffix in SUFFIXES):
         return True
     return False
 
@@ -54,12 +64,12 @@ class AuthCodeMiddleware(BaseHTTPMiddleware):
         try:
             db = get_db()
             user_service = UserService(next(db))
-            if not is_enrol_endpoint(request.url.path) and not user_service.fetch_application(application):
+            if not is_enrol_endpoint(request.url.path) and not is_exception_endpoint(request.url.path) and not user_service.fetch_application(application):
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "Invalid application"}
                 )
-            if is_public_endpoint(request.url.path) or is_enrol_endpoint(request.url.path):
+            if is_public_endpoint(request.url.path) or is_enrol_endpoint(request.url.path) or is_exception_endpoint(request.url.path):
                 return await call_next(request)
 
 
@@ -77,6 +87,12 @@ class AuthCodeMiddleware(BaseHTTPMiddleware):
             # request.state.user = user  # Attach user to request state for potential use in endpoints
 
             # --- Authorization Logic ---
+            if not user_data.is_verified:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Forbidden: Your account has not been verified."}
+                )
+
             if (user_data.applications is None) or ((user_data.applications) and (application not in user_data.applications)):
                 return JSONResponse(
                     status_code=403,
@@ -84,6 +100,23 @@ class AuthCodeMiddleware(BaseHTTPMiddleware):
                 )
 
             # Check if the requested endpoint requires a specific permission
+            required_permission = user_service.fetch_route_map(request.url.path)
+            if required_permission:
+                permissions = user_service.get_user_permissions(user_data.id)
+                # permissions = []
+                # if required_permission.permission_name:
+                #     user_roles = [role.name for role in user_data.roles]
+                #     for role in user_roles:
+                #         for perm in user_service.get_permissions_by_role(role):
+                #             permissions.append(perm.name)
+
+                if required_permission.permission_name not in permissions:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Forbidden: You do not have the required permission to access this endpoint."}
+                    )
+                
+
             # required_permission = ENDPOINT_PERMISSIONS.get(request.url.path)
             # if required_permission:
             #     user_permissions = user_service.get_user_permissions(user.id)
@@ -96,6 +129,16 @@ class AuthCodeMiddleware(BaseHTTPMiddleware):
 
             return await call_next(request)
 
+        except NotFoundException as e:
+            return JSONResponse(
+                status_code=404,
+                content={"detail": e.detail}
+            )
+        except AlreadyExistsException as e:
+            return JSONResponse(
+                status_code=409, # 409 Conflict is appropriate for existing resources
+                content={"detail": e.detail}
+            )
         except HTTPException as e:
             return JSONResponse(
                 status_code=e.status_code,

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
+from starlette.responses import RedirectResponse
 from services import UserService
 from db import get_db
 from sqlalchemy.orm import Session
@@ -61,6 +62,7 @@ async def sso_login(request: Request, provider: str):
             detail=f"Unsupported provider: '{provider}'. Supported providers are: {list(oauth._clients.keys())}"
         )
     redirect_uri = request.url_for("sso_auth", provider=provider)
+    # return RedirectResponse(redirect_uri, headers={"X-Application": request.headers.get("X-Application")})
     return await oauth.create_client(provider).authorize_redirect(request, redirect_uri)
 
 

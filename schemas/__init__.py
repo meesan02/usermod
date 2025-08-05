@@ -2,7 +2,6 @@ from .user import (
     UserBase,
     UserCreate,
     UserInDB,
-    UserUpdate,
     UserLogin,
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -13,17 +12,14 @@ from .user import (
     RoleInDB,
     GetRole,
     PermissionBase,
-    PermissionCreate,
-    PermissionInDB,
-    GetPermission,
-    Role,
+    FetchPermission,
+    Map,
 )
 
 __all__ = [
     "UserBase",
     "UserCreate",
     "UserInDB",
-    "UserUpdate",
     "UserLogin",
     "ForgotPasswordRequest",
     "ResetPasswordRequest",
@@ -34,8 +30,6 @@ __all__ = [
     "RoleInDB",
     "GetRole",
     "PermissionBase",
-    "PermissionCreate",
-    "PermissionInDB",
-    "GetPermission",
-    "Role",
+    "FetchPermission",
+    "Map",
     ]

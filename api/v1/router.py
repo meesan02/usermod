@@ -14,6 +14,9 @@ from schemas import (
     RoleBase,
     RoleCreate,
     RoleInDB,
+    FetchPermission,
+    Map,
+    PermissionBase,
 )
 from services import UserService
 from repository import UserRepository
@@ -63,27 +66,15 @@ def forgot_password(
     application = request.headers.get("X-Application")
     return UserService(db).forgot_password(request_data.email, application)
 
+
 @router.post("/reset-password")
 def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     return UserService(db).reset_password(request.token, request.new_password)
 
-@router.post("/permissions", response_model=list[str])
-def get_permissions(request: PermissionsRequest, db: Session = Depends(get_db)):
-    return UserService(db).get_user_permissions(request.user_id)
 
-@router.post("/assign-role", response_model=UserInDB)
-def assign_role(request: AssignRoleRequest, db: Session = Depends(get_db)):
-    updated_user = UserService(db).assign_role(request.user_id, request.role_name)
-    return UserInDB(
-        user_id=updated_user.id,
-        email=updated_user.email,
-        username=updated_user.username,
-        first_name=updated_user.first_name,
-        last_name=updated_user.last_name,
-        is_active=updated_user.is_active,
-        is_verified=updated_user.is_verified,
-        roles=[role.name for role in updated_user.roles]
-    )
+@router.post("/verify-user")
+def verify_user(user_id: str, verification_status: bool = True, db: Session = Depends(get_db)):
+    return UserRepository(db).update_user_verification(user_id, verification_status)
 
 
 @router.post("/get-user", response_model=UserInDB)
@@ -109,6 +100,19 @@ def get_current_user(user: UserBase, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/permissions", response_model=list[str])
+def get_permissions(request: PermissionsRequest, db: Session = Depends(get_db)):
+    return UserService(db).get_user_permissions(request.user_id)
+
+@router.post('/create-permission')
+def create_permission(permission: PermissionBase, db: Session = Depends(get_db)):
+    return UserService(db).create_permission(permission.name, permission.description)
+
+@router.post('/delete-permission')
+def delete_permission(permission_name: str, db: Session = Depends(get_db)):
+    return UserRepository(db).delete_permission(permission_name)
+
+
 @router.post("/create-role", response_model=RoleInDB)
 def create_role(role: RoleCreate, db: Session = Depends(get_db)):
     user_repo = UserRepository(db)
@@ -120,7 +124,7 @@ def create_role(role: RoleCreate, db: Session = Depends(get_db)):
     role_exists = user_repo.get_role_by_name(role_name=role.name)
     if role_exists:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role already exists")
-    role = user_service.get_or_create_role(role_name=role.name, permissions=role.permissions)
+    role = user_service.create_role(role_name=role.name, permissions=role.permissions)
     return RoleInDB(
         id=role.id,
         name=role.name,
@@ -139,6 +143,40 @@ def get_roles(role: RoleBase, db: Session = Depends(get_db)):
         # users=role.users
     )
 
+@router.post('/delete-role')
+def delete_role(role_name: str, db: Session = Depends(get_db)):
+    return UserRepository(db).delete_role(role_name)
+
+@router.post("/assign-role")
+def assign_role(request: AssignRoleRequest, db: Session = Depends(get_db)):
+    return UserService(db).assign_role(request.user_id, request.role_name)
+    # return UserInDB(
+    #     user_id=updated_user.id,
+    #     email=updated_user.email,
+    #     username=updated_user.username,
+    #     first_name=updated_user.first_name,
+    #     last_name=updated_user.last_name,
+    #     is_active=updated_user.is_active,
+    #     is_verified=updated_user.is_verified,
+    #     roles=[role.name for role in updated_user.roles]
+    # )
+
+
+@router.post("/remove-role")
+def remove_role(request: AssignRoleRequest, db: Session = Depends(get_db)):
+    return UserService(db).remove_role(request.user_id, request.role_name)
+
+
+@router.post("/add-permission-to-role")
+def add_permission(request: FetchPermission, db: Session = Depends(get_db)):
+    return UserService(db).add_permission_to_role(request.role_name, request.name)
+
+
+@router.post("/remove-permission-from-role")
+def remove_permission(request: FetchPermission, db: Session = Depends(get_db)):
+    return UserService(db).remove_permission_from_role(request.role_name, request.name)
+
+
 @router.post("/applications")
 def get_applications(user: UserBase, db: Session = Depends(get_db)):
     return UserRepository(db).get_applications_by_user_id(user_id=user.user_id)
@@ -146,7 +184,11 @@ def get_applications(user: UserBase, db: Session = Depends(get_db)):
 @router.post("/update-applications")
 def update_applications(user: UserBase, application: str, db: Session = Depends(get_db)):
     try:
-        return UserService(db).update_application(user_id=user.user_id, application=application)
+        if application is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application not provided")
+        if user.user_id:
+            return UserService(db).update_application(user_id=user.user_id, application=application)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not provided")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -157,3 +199,27 @@ def enrol_application(application: str, description: str = None, db: Session = D
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+
+@router.post('/create-route-mapping')
+def create_mapping(mappings: list[Map], db: Session = Depends(get_db)):
+    for mapping in mappings:
+        UserService(db).create_route_map(mapping.route, mapping.permission)
+    return {"detail": "Route mapping created successfully."}
+
+@router.post('/fetch-route-mapping')
+def fetch_mapping(route: str, db: Session = Depends(get_db)):
+    return UserService(db).fetch_route_map(route)
+
+@router.post('/update-route-mapping')
+def update_mapping(route: str, old_permission: str, new_permission: str, db: Session = Depends(get_db)):
+    UserService(db).update_route_map_permission(route, old_permission, new_permission)
+    return {"detail": "Route mapping updated successfully."}
+
+@router.post('/delete-route-mapping')
+def delete_mapping(route: str, db: Session = Depends(get_db)):
+    UserService(db).delete_route_map(route)
+    return {"detail": "Route mapping deleted successfully."}
+
+@router.get('/fetch-all-route-mapping')
+def fetch_all_mapping(db: Session = Depends(get_db)):
+    return UserService(db).fetch_all_route_map()

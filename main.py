@@ -8,11 +8,19 @@ from middleware import AuthCodeMiddleware, custom_openapi_authcode_header
 from helper import get_session_secret
 from core import settings
 from db import create_db_and_tables
+from contextlib import asynccontextmanager
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """Initialize database and perform any startup tasks"""
+#     create_db_and_tables()
+#     yield
 
 app = FastAPI(
     title="User Microservice",
     description="A microservice for managing users.",
     version="1.0.0",
+    # lifespan=lifespan,
 )
 
 app.include_router(router, prefix=settings.API_V1_STR, tags=["User Management"])
@@ -33,10 +41,16 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-@app.on_event("startup")
-async def on_startup():
+# @app.on_event("startup")
+# async def on_startup():
+@asynccontextmanager
+async def lifespan():
     """Initialize database and perform any startup tasks"""
     create_db_and_tables()
+    yield
+
+app.add_event_handler("startup", lifespan) #TODO: If lifespan is moved to start, then this can be removed.
+
 
 
 if __name__ == "__main__":
