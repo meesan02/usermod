@@ -231,9 +231,14 @@ class MicroserviceAuthMiddleware(BaseHTTPMiddleware):
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED, detail="Missing Authentication headers"
             )
+        app_header = request.headers.get("X-Application")
+        if not auth_header:
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED, detail="Missing Application headers"
+            )
 
         validate_url = f"{settings.USER_SERVICE_URL}{settings.USER_SERVICE_AUTHENTICATE_ENDPOINT}"
-        headers = {"X-Auth-Code": auth_header}
+        headers = {"X-Auth-Code": auth_header, "X-Application": app_header}
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(validate_url, headers=headers)
@@ -272,13 +277,19 @@ def custom_openapi():
         "in": "header",
         "description": "A unique authentication code provided after a successful login. This must be included in the header for all protected endpoints."
     }
+    security_schemes["XApplicationHeader"] = {
+        "type": "apiKey",
+        "name": "X-Application",
+        "in": "header",
+        "description": "The name of the application making the request. This may be used for authorization or logging purposes."
+    }
     public_paths = [
         "/",
         app.docs_url,
         app.redoc_url,
         app.openapi_url,
     ]
-    security_requirement = [{"XAuthCodeHeader": []}]
+    security_requirement = [{"XAuthCodeHeader": [], "XApplicationHeader": []}]
     all_paths = openapi_schema.get("paths", {})
     for path, path_item in all_paths.items():
         if path not in public_paths:

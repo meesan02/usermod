@@ -30,8 +30,9 @@ router.include_router(sso_router, prefix="/sso")
 
 
 @router.post("/register", response_model=UserInDB)
-def register(user: UserCreate, db: Session = Depends(get_db)):
-    new_user = UserService(db).register_user(user)
+def register(user: UserCreate, request: Request, db: Session = Depends(get_db)):
+    application = request.headers.get("X-Application")
+    new_user = UserService(db).register_user(user, application)
     return UserInDB(
         user_id=new_user.id,
         email=new_user.email,

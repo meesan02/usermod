@@ -10,7 +10,7 @@ class UserService:
     def __init__(self, db):
         self.repo = UserRepository(db)
 
-    def register_user(self, user_data):
+    def register_user(self, user_data, application_name: str = None):
         if self.repo.get_by_email(user_data.email) or self.repo.get_by_username(user_data.username):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email or username already registered")
         hashed_pw = hash_password(user_data.password)
@@ -24,6 +24,8 @@ class UserService:
             is_verified=False,
             consent=user_data.consent,
         )
+        if application_name:
+            new_user.applications = [application_name]
         return self.repo.add_user(new_user)
 
     def authenticate_user(self, user_data, application_name: str = None):
