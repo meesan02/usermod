@@ -17,6 +17,69 @@ A modular, production-ready FastAPI microservice for user authentication, author
 
 ---
 
+## 🚀 How to Use This Microservice
+
+### 1. 📥 Clone the Repository
+
+```bash
+git clone git@github.com:meesan02/usermod.git
+cd usermod
+```
+
+### 2. 🐍 Set Up a Virtual Environment
+
+```bash
+python -m venv venv
+venv\Scripts\activate   # On Windows
+# Or, for Linux/macOS:
+# source venv/bin/activate
+```
+
+### 3. 📦 Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. ⚙️ Configure Environment Variables
+
+- Copy the example environment file and fill in your values:
+  ```bash
+  copy .env.example .env   # On Windows
+  # Or, for Linux/macOS:
+  # cp .env.example .env
+  ```
+- Edit `.env` with your database and OAuth credentials.
+
+### 5. 🏁 Run the Microservice
+
+```bash
+python main.py
+# Or using uvicorn for development:
+# uvicorn main:app --reload --host 127.0.0.1 --port 8001
+```
+
+### 6. 🔗 Integrate with Your Main Application
+
+- Ensure your main application's `.env` has:
+  ```
+  AUTH_ENABLED=True
+  USER_SERVICE_URL="http://127.0.0.1:8001/api/v1"
+  USER_SERVICE_AUTHENTICATE_ENDPOINT="/authenticate"
+  ```
+- Use HTTP requests from your main app to interact with the user microservice endpoints.
+
+---
+
+**Tip:**  
+- Use `git pull` to update your local copy when changes are made to the repository.
+- For development, create a new branch:  
+  ```bash
+  git checkout -b feature/my-new-feature
+  ```
+
+---
+
 ## 🔌 Conditional Activation
 
 The microservice is enabled or disabled via the `AUTH_ENABLED` setting in your root `.env` file. This acts as a feature flag, allowing you to run the application with or without authentication and user management.
@@ -254,3 +317,4 @@ if settings.AUTH_ENABLED:
 ## 📝 License
 
 This microservice is intended for use as part of a larger FastAPI project. Please see your main application's license for details.
+---
