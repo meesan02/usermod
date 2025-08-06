@@ -1,96 +1,122 @@
-# 👤 User Management Module
+# 👤 User Management Microservice
 
-This package provides a comprehensive, self-contained solution for user authentication, authorization, and management within a FastAPI application. It is designed to be highly modular and can be **conditionally activated** via a single environment variable in the main application.
+A modular, production-ready FastAPI microservice for user authentication, authorization, and management. Designed for seamless integration into a microservices architecture, it supports conditional activation and secure communication with your main application.
+
+---
 
 ## ✨ Features
 
-- 🔑 **User Authentication**: Standard email/password registration and login.
-- 🌐 **Single Sign-On (SSO)**: OAuth2 integration with Google and GitHub.
-- 🛡️ **Role-Based Access Control (RBAC)**: Create roles and assign permissions to users.
-- 🔌 **Conditional Activation**: The entire module can be enabled or disabled from the main application's `.env` file, providing a powerful feature flag for security.
-- 🔒 **Secure Password Handling**: Password hashing and verification using `passlib`.
-- 🗄️ **Database Management**: Automated creation of database tables and efficient session management with SQLAlchemy.
-- ⚙️ **Self-Contained Configuration**: The module loads its own `.env` file with precedence, ensuring its settings are isolated and predictable.
-- 🎭 **Custom Authentication**: Includes a custom middleware for authentication using a generated auth code.
+- 🔑 **User Authentication**: Email/password registration and login.
+- 🌐 **Single Sign-On (SSO)**: OAuth2 with Google and GitHub.
+- 🛡️ **Role-Based Access Control (RBAC)**: Create roles, assign permissions.
+- 🔌 **Conditional Activation**: Enable/disable via a single environment variable.
+- 🔒 **Secure Password Handling**: Password hashing with `passlib`.
+- 🗄️ **Automated Database Management**: Table creation and session management with SQLAlchemy.
+- ⚙️ **Self-Contained Configuration**: Loads its own `.env` file for isolated settings.
+- 🎭 **Custom Auth Middleware**: Auth code-based authentication for all protected endpoints.
 
 ---
 
 ## 🔌 Conditional Activation
 
-The entire user module can be enabled or disabled based on the `AUTH_ENABLED` setting in your root `.env` file. This provides a powerful "feature flag" for the authentication system, making it simple to run the application in different modes (e.g., with or without security) without changing any code.
+The microservice is enabled or disabled via the `AUTH_ENABLED` setting in your root `.env` file. This acts as a feature flag, allowing you to run the application with or without authentication and user management.
 
-When `AUTH_ENABLED=True`, the main application will:
-1.  Add the `AuthCodeMiddleware` to protect endpoints.
-2.  Include the user and SSO API routers.
-3.  Customize the OpenAPI (Swagger) documentation to include authentication headers.
+---
 
 ## 📁 Module Structure
 
-The module is organized to separate concerns, making it maintainable and scalable.
-
 ```
-user/
-├── .env.example         # Example environment variables for this module
-├── __init__.py          # Package entry point, exposes key components
-├── auth_headers.py      # Helper to customize OpenAPI docs for auth
-├── config.py            # Pydantic settings and configuration management
-├── db.py                # Database engine, session management, and table creation
-├── helper.py            # Utility functions (e.g., password hashing)
-├── middleware.py        # Custom middleware for authentication
-├── models.py            # SQLAlchemy ORM models
-├── permissions.py       # Defines roles and permissions constants
-├── requirements.txt     # Python dependencies specific to this module
-├── repository.py        # Data access layer (direct database queries)
-├── router.py            # Main API endpoints for user actions
-├── schemas.py           # Pydantic schemas for data validation (API models)
-├── service.py           # Business logic layer
-└── sso_router.py        # API endpoints for SSO (Google, GitHub)
+usermod/
+├── .env.example          # Example environment variables for this module
+├── main.py               # Application entry point
+├── permissions.py        # Defines roles and permissions constants
+├── README.md
+├── requirements.txt      # Python dependencies specific to this module
+├── __init__.py           # Package entry point, exposes key components
+│
+├── api/
+│   ├── __init__.py
+│   └── v1/
+│       ├── router.py         # Main API endpoints for user actions
+│       └── sso_router.py     # API endpoints for SSO (Google, GitHub)
+│
+├── core/
+│   ├── config.py            # Pydantic settings and configuration management
+│   ├── exceptions.py        # Custom exception classes
+│   └── __init__.py
+│
+├── db/
+│   ├── db.py                # Database engine, session management, and table creation
+│   └── __init__.py
+│
+├── helper/
+│   ├── helper.py            # Utility functions (e.g., password hashing)
+│   └── __init__.py
+│
+├── middleware/
+│   ├── auth_headers.py      # Helper to customize OpenAPI docs for auth
+│   ├── user.py              # Custom middleware for authentication
+│   └── __init__.py
+│
+├── models/
+│   ├── user.py              # SQLAlchemy ORM models
+│   └── __init__.py
+│
+├── repository/
+│   ├── user.py              # Data access layer (direct database queries)
+│   └── __init__.py
+│
+├── schemas/
+│   ├── user.py              # Pydantic schemas for data validation (API models)
+│   └── __init__.py
+│
+└── services/
+    ├── user.py              # Business logic
 ```
 
 ---
 
 ## ⚙️ Configuration & Setup
 
-This module's functionality is controlled by environment variables in two locations:
+This microservice uses environment variables from two locations:
 
-1.  **Root `.env` file**: The main application's `.env` file controls whether this module is active.
-2.  **User Module `.env` file**: A dedicated `.env` file inside the `user/` directory contains all settings specific to this module.
+1. **Root `.env` file**: Controls whether this module is active and how the main service communicates with it.
+2. **User Module `.env` file**: Contains all settings specific to this module.
 
 ### 1. Main Application Configuration
 
-Place this variable in your project's root `.env` file (e.g., `backend/.env`).
+Add these variables to your project's root `.env` file (e.g., `backend/.env`):
 
-#### **Root Environment Variable**
-| Variable | Description |
-|---|---|
-| `AUTH_ENABLED` | Set to `True` to enable the user module and its endpoints. Set to `False` to disable it. |
+| Variable                              | Description                                                        |
+|----------------------------------------|--------------------------------------------------------------------|
+| `AUTH_ENABLED`                        | Set to `True` to enable the user module and its endpoints.         |
+| `USER_SERVICE_URL`                    | Base URL for the user microservice (e.g., `http://127.0.0.1:8001/api/v1`). |
+| `USER_SERVICE_AUTHENTICATE_ENDPOINT`  | Path for the authentication endpoint (e.g., `/authenticate`).      |
 
 ### 2. User Module Configuration
 
-Create a `.env` file in the `user/` directory. The `__init__.py` file ensures these variables are loaded with precedence over any other `.env` file. The variable names below are what the application code expects.
+Create a `.env` file in the `usermod/` directory. The `__init__.py` ensures these variables are loaded with precedence.
 
-**Important**: The variable names below are what the application code expects. Note the `USER_` prefix for database settings, which is required for the configuration to load correctly and avoid conflicts with the main application's database settings.
+| Variable               | Description                                      |
+|------------------------|--------------------------------------------------|
+| `USER_DB_USER`         | Username for the user database                   |
+| `USER_DB_PASSWORD`     | Password for the user database                   |
+| `USER_DB_HOST`         | Host where the user database is running          |
+| `USER_DB_PORT`         | Port for the user database connection            |
+| `USER_DB_NAME`         | Name of the user database                        |
+| `SECRET_KEY`           | Secret key for signing tokens and security ops   |
+| `GOOGLE_CLIENT_ID`     | Client ID for Google OAuth2 SSO                  |
+| `GOOGLE_CLIENT_SECRET` | Client Secret for Google OAuth2 SSO              |
+| `GITHUB_CLIENT_ID`     | Client ID for GitHub OAuth SSO                   |
+| `GITHUB_CLIENT_SECRET` | Client Secret for GitHub OAuth SSO               |
 
-#### **User Module Environment Variables**
-| Variable | Description |
-|---|---|
-| `USER_DB_USER` | The username for the user database. |
-| `USER_DB_PASSWORD` | The password for the user database. |
-| `USER_DB_HOST` | The host where the user database is running. |
-| `USER_DB_PORT` | The port for the user database connection. |
-| `USER_DB_NAME` | The name of the user database. |
-| `SECRET_KEY` | A secret key for signing tokens and security operations.|
-| `GOOGLE_CLIENT_ID` | The Client ID for Google OAuth2 SSO. |
-| `GOOGLE_CLIENT_SECRET` | The Client Secret for Google OAuth2 SSO. |
-| `GITHUB_CLIENT_ID` | The Client ID for GitHub OAuth SSO. |
-| `GITHUB_CLIENT_SECRET` | The Client Secret for GitHub OAuth SSO. |
-
+---
 
 ### 3. 📦 Dependency Management
 
-To maintain its modularity, the `user` package manages its own Python dependencies in a dedicated `requirements.txt` file. This ensures that all libraries required for user authentication and management are self-contained.
+All dependencies are managed in a dedicated `requirements.txt`:
 
-**File (`user/requirements.txt`):**
+**File (`usermod/requirements.txt`):**
 ```
 Authlib==1.6.1
 dnspython==2.7.0
@@ -98,95 +124,133 @@ email_validator==2.2.0
 passlib==1.7.4
 ```
 
-These dependencies are specific to the user module's functionality:
-- `Authlib`: For handling OAuth2 SSO with providers like Google and GitHub.
-- `passlib`: For securely hashing and verifying user passwords.
-- `email_validator`: For validating email formats during registration.
-
-#### Integration with Main Application
-
-The module's dependencies are seamlessly integrated into the main application's environment by referencing this file from the root `requirements.txt`.
-
-**File (`/requirements.txt`):**
-```
--r user/requirements.txt
-# ... other main application dependencies
-```
-
-This approach enhances modularity by keeping feature-specific dependencies isolated, making the system cleaner and easier to maintain. It aligns perfectly with the conditional activation philosophy, as the dependencies are grouped with the feature they support.
-
 ---
 
+## 🚀 Integration with Main Service
 
-## 🚀 Integration Guide
+The main service communicates with this microservice via HTTP and uses middleware to enforce authentication. Below is a typical integration pattern:
 
-This module is designed for seamless integration into a main FastAPI application. The integration is driven by the `AUTH_ENABLED` flag, allowing you to conditionally enable all authentication and user management features. Below are the key integration points.
+### 1. Feature Flags and Service URLs
 
-### 1. Activating the Module in the Main Application
-
-The core activation logic involves conditionally including the module's routers, middleware, and OpenAPI customizations in your main application files (`main.py` and `routers.py`).
-
-#### **Context & Functionality**
-- **Router Inclusion**: The `*User module's router*` (`router.py`) contains all API endpoints for user actions like registration, login, SSO, and role management. Including it makes these endpoints available under the `/users` prefix.
-- **Middleware (`AuthCodeMiddleware`)**: This middleware intercepts incoming requests to validate the `auth_code` header, providing a centralized security layer for your entire application.
-- **OpenAPI Customization (`custom_openapi_authcode_header`)**: This helper function enhances the interactive API docs (Swagger/ReDoc) by adding a field for the `auth_code` header, making it easy for developers to test protected endpoints.
-
-#### **Usage & "Why it's used"**
-This conditional approach is powerful because it allows the entire security layer to be toggled on or off via a single environment variable. It keeps the main application clean and decouples it from the user management logic.
-
-**Example (`routers.py`): Including the API Endpoints**
-This code adds the user management routes to your application's main router.
-
+**config.py**
 ```python
-from app.core.config import settings
-
-if settings.AUTH_ENABLED:
-    from user import router as user_router
-    router.include_router(user_router, prefix="/users", tags=["User Management"])
+AUTH_ENABLED: bool = Field(True, env="AUTH_ENABLED")
+USER_SERVICE_URL: Optional[str] = Field(None, env="USER_SERVICE_URL")
+USER_SERVICE_AUTHENTICATE_ENDPOINT: Optional[str] = Field(None, env="USER_SERVICE_AUTHENTICATE_ENDPOINT")
 ```
 
-**Example (`main.py`): Adding Middleware and Customizing API Docs**
-This snippet adds the authentication middleware and updates the OpenAPI schema, but only if authentication is enabled.
+**.env**
+```
+AUTH_ENABLED=True
+USER_SERVICE_URL="http://127.0.0.1:8001/api/v1"
+USER_SERVICE_AUTHENTICATE_ENDPOINT="/authenticate"
+```
 
+### 2. Authentication Middleware
+
+**main.py**
 ```python
-from app.core.config import settings
+from starlette.middleware.base import BaseHTTPMiddleware
+import httpx
+from fastapi import Request, HTTPException
+from starlette.status import HTTP_401_UNAUTHORIZED
+
+class MicroserviceAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        public_prefixes = ["/docs", "/redoc", f"{settings.API_V1_STR}/openapi.json"]
+        if request.url.path == "/" or any(
+            request.url.path.startswith(prefix) for prefix in public_prefixes
+        ):
+            return await call_next(request)
+
+        auth_header = request.headers.get("X-Auth-Code")
+        if not auth_header:
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED, detail="Missing Authentication headers"
+            )
+
+        validate_url = f"{settings.USER_SERVICE_URL}{settings.USER_SERVICE_AUTHENTICATE_ENDPOINT}"
+        headers = {"X-Auth-Code": auth_header}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(validate_url, headers=headers)
+                if response.status_code == 200:
+                    return await call_next(request)
+                else:
+                    detail = response.json().get("detail", "Invalid token or user service error")
+                    raise HTTPException(status_code=response.status_code, detail=detail)
+            except httpx.RequestError as exc:
+                raise HTTPException(status_code=503, detail=f"User service is unavailable: {exc}")
 
 if settings.AUTH_ENABLED:
-    from user import AuthCodeMiddleware, custom_openapi_authcode_header
+    app.add_middleware(MicroserviceAuthMiddleware)
+```
 
-    # Add the middleware to the application pipeline
-    app.add_middleware(AuthCodeMiddleware)
-    
-    # Define a function to customize OpenAPI
-    def custom_openapi():
-        return custom_openapi_authcode_header(app, settings.PROJECT_NAME)
+### 3. OpenAPI Customization
 
-    # Apply the custom OpenAPI schema
+**main.py**
+```python
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=settings.PROJECT_NAME,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    components = openapi_schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["XAuthCodeHeader"] = {
+        "type": "apiKey",
+        "name": "X-Auth-Code",
+        "in": "header",
+        "description": "A unique authentication code provided after a successful login. This must be included in the header for all protected endpoints."
+    }
+    public_paths = [
+        "/",
+        app.docs_url,
+        app.redoc_url,
+        app.openapi_url,
+    ]
+    security_requirement = [{"XAuthCodeHeader": []}]
+    all_paths = openapi_schema.get("paths", {})
+    for path, path_item in all_paths.items():
+        if path not in public_paths:
+            for method_details in path_item.values():
+                if isinstance(method_details, dict):
+                    method_details.setdefault("security", []).extend(security_requirement)
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+if settings.AUTH_ENABLED:
     app.openapi = custom_openapi
 ```
 
-### 2. Initializing the Database on Startup
+---
 
-The module provides a `create_db_and_tables` function to set up the necessary database schema (`users` and `roles` tables).
+## 🛠️ Core Capabilities
 
-#### **Context & Functionality**
-This function inspects the SQLAlchemy models defined within the `user` module and creates the corresponding tables in the database if they do not already exist.
+- **User Registration & Login**: Standard and OAuth2 flows.
+- **Role & Permission Management**: Create, assign, and remove roles/permissions.
+- **Custom Middleware**: Centralized authentication using an encoded auth code.
+- **Extensible**: Add new OAuth providers or permission types as needed.
 
-#### **Usage & "Why it's used"**
-This is a crucial setup step that must be performed when the application starts. By calling it within a FastAPI `startup` event, you guarantee that the database schema is ready before the application begins to handle requests that interact with user data. This prevents runtime errors related to missing tables.
+---
 
-**Example (`main.py`): Creating Tables on Application Startup**
-```python
-from fastapi import FastAPI
-from app.core.config import settings # Main app settings
+## 💡 Suggestions for Improvement
 
-app = FastAPI()
+- 📚 **Add API Documentation**: Use FastAPI's built-in docs for endpoint documentation.
+- 🧪 **Unit & Integration Tests**: Expand test coverage for all service and repository methods.
+- 🔄 **Refresh Token Support**: Add refresh token logic for longer-lived sessions.
+- 🛑 **Rate Limiting**: Implement rate limiting for sensitive endpoints (e.g., login).
+- 🔔 **Notification Hooks**: Add hooks for sending emails on registration, password reset, etc.
+- 📈 **Monitoring**: Integrate logging and monitoring for authentication events.
 
-@app.on_event("startup")
-def on_startup():
-    # Create database tables for the user module only if auth is enabled
-    if settings.AUTH_ENABLED:
-        from user import create_db_and_tables
-        print("Creating database and tables for user module...")
-        create_db_and_tables()
-```
+---
+
+## 📝 License
+
+This microservice is intended for use as part of a larger FastAPI project. Please see your main application's license for details.

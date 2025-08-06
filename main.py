@@ -41,15 +41,15 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# @app.on_event("startup")
-# async def on_startup():
-@asynccontextmanager
-async def lifespan():
+@app.on_event("startup")
+async def on_startup():
+# @asynccontextmanager
+# async def lifespan():
     """Initialize database and perform any startup tasks"""
     create_db_and_tables()
-    yield
+    # yield
 
-app.add_event_handler("startup", lifespan) #TODO: If lifespan is moved to start, then this can be removed.
+# app.add_event_handler("startup", lifespan) #TODO: If lifespan is moved to start, then this can be removed.
 
 
 

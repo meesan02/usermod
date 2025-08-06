@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from .user import is_public_path, is_public_endpoint, is_enrol_endpoint
+from .user import is_public_path, is_public_endpoint, is_enrol_endpoint, is_exception_endpoint
 
 
 def custom_openapi_authcode_header(app: FastAPI, project_name: str, project_version: str, project_description: str):
@@ -38,7 +38,7 @@ def custom_openapi_authcode_header(app: FastAPI, project_name: str, project_vers
     for path, path_item in all_paths.items():
         for method_details in path_item.values():
             if isinstance(method_details, dict):
-                if not is_public_path(path) and not is_public_endpoint(path) and not is_enrol_endpoint(path):
+                if not is_public_path(path) and not is_public_endpoint(path) and not is_enrol_endpoint(path) and not is_exception_endpoint(path):
                     method_details.setdefault("security", []).extend(security_requirement)
                 elif is_enrol_endpoint(path):
                     method_details.setdefault("security", []).extend(auth_security_requirement)
