@@ -317,4 +317,3 @@ if settings.AUTH_ENABLED:
 ## 📝 License
 
 This microservice is intended for use as part of a larger FastAPI project. Please see your main application's license for details.
----
