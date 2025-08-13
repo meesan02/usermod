@@ -12,7 +12,7 @@ dotenv_path = Path(__file__).resolve().parent / '.env'
 load_dotenv(dotenv_path=dotenv_path, override=True)
 
 # Routers
-from .app import router, sso_router
+from .api import router, sso_router
 
 # Core components
 from .services import UserService

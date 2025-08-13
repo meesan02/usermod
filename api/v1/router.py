@@ -20,6 +20,7 @@ from schemas import (
 )
 from services import UserService
 from repository import UserRepository
+from models import User
 
 
 router = APIRouter()
@@ -54,8 +55,22 @@ def login(user: UserLogin, request: Request, db: Session = Depends(get_db)):
 def authenticate(request: Request, db: Session = Depends(get_db)):
     auth_code = request.headers.get("X-Auth-Code")
     application = request.headers.get("X-Application")
+    resp_obj = {"status_code": status.HTTP_200_OK, "message": "Authentication successful"}
     if UserService(db).validate_auth_code(auth_code, application):
-        return {"status_code": status.HTTP_200_OK, "message": "Authentication successful"}
+        if isinstance(request.state.user, User):
+            user_obj = request.state.user
+            resp_obj["user"] = UserInDB(
+                user_id=user_obj.id,
+                email=user_obj.email,
+                first_name=user_obj.first_name,
+                last_name=user_obj.last_name,
+                username=user_obj.username,
+                roles=[role.name for role in user_obj.roles],
+                is_active=user_obj.is_active,
+                is_verified=user_obj.is_verified,
+                consent=user_obj.consent,
+            )
+        return resp_obj
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
 
@@ -79,7 +94,23 @@ def verify_user(user_id: str, verification_status: bool = True, db: Session = De
 
 
 @router.post("/get-user", response_model=UserInDB)
-def get_current_user(user: UserBase, db: Session = Depends(get_db)):
+def get_current_user(req:Request, user: UserBase, db: Session = Depends(get_db)):
+    # print(req.state.keys())
+    # print(req.state.__contains__("user"))
+    # print(isinstance(req.state.user, User))
+    # if isinstance(req.state.user, User):
+    #     print(req.state.user.id)
+        # if isinstance(req.state, dict) and req.state.__contains__("user") and isinstance(req.state["user"], User):
+            # print('*************')
+    # print(req.user)
+    # for key, value in req.state.__dict__.items():
+    #     if isinstance(value, dict) and value.__contains__("user") and isinstance(value["user"], User):
+    #             print(value["user"].id)
+        #     print(f"  {key}: {type(value['user'])}")
+        #     for i in value:
+        #         print(f" ======   {i}: {value[i].id}")
+        # else:
+        #     print(f"{key}: {value}")
     if user.email and user.user_id:
         user = UserRepository(db).get_user_by_id_and_email(user_id=user.user_id, email=user.email)
     elif user.username and user.user_id:

@@ -18,7 +18,7 @@ class UserCreate(BaseModel):
 class UserInDB(UserBase):
     first_name: Optional[str] = Field(..., max_length=100)
     last_name: Optional[str] = Field(..., max_length=100)
-    role: Optional[str] = Field(None, max_length=72)
+    # role: Optional[str] = Field(None, max_length=72)
     is_active: Optional[bool] = True
     is_verified: Optional[bool] = False
     consent: Optional[bool] = False

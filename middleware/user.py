@@ -127,6 +127,8 @@ class AuthCodeMiddleware(BaseHTTPMiddleware):
             #         )
             # --- End Authorization Logic ---
 
+            request.state.user = user_data
+
             return await call_next(request)
 
         except NotFoundException as e:
